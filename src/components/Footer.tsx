@@ -209,10 +209,6 @@ export default function Footer() {
             <p>
               © {new Date().getFullYear()} <strong>{config.nombre}</strong> ({config.razon_social} - CUIT {config.cuit}). Todos los derechos reservados.
             </p>
-            <p className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-600 inline-block" />
-              Blanco, Negro & Rojo • Pasión por las dos ruedas
-            </p>
           </div>
         </div>
       </div>
