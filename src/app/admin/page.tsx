@@ -26,6 +26,10 @@ import {
   X,
   Lock,
   LogOut,
+  Upload,
+  Download,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 import {
@@ -54,6 +58,7 @@ export default function AdminDashboardPage() {
     config,
     isLiveSupabase,
     getMarcaNombre,
+    getCategoriaNombre,
     saveMoto,
     deleteMoto,
     toggleEstadoMoto,
@@ -61,6 +66,7 @@ export default function AdminDashboardPage() {
     toggleDestacadaMoto,
     toggleOfertaMesMoto,
     toggleAllPrecios,
+    importMotosMasivo,
     updateLeadFinanciacion,
     updateLeadPermuta,
     saveVendedor,
@@ -348,6 +354,392 @@ export default function AdminDashboardPage() {
     a.click();
   };
 
+  // =========================================================================
+  // EXPORTACIÓN E IMPORTACIÓN MASIVA DE INVENTARIO (EXCEL / CSV)
+  // =========================================================================
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importModo, setImportModo] = useState<'merge' | 'replace'>('merge');
+  const [importPreviewRows, setImportPreviewRows] = useState<
+    Array<{
+      payload: Omit<Moto, 'id' | 'created_at' | 'updated_at'> & { id?: string };
+      marcaLabel: string;
+      categoriaLabel: string;
+      isUpdate: boolean;
+    }>
+  >([]);
+  const [importError, setImportError] = useState('');
+  const [importSuccessMsg, setImportSuccessMsg] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const INVENTARIO_CSV_HEADERS = [
+    'ID',
+    'Titulo',
+    'Marca',
+    'Categoria',
+    'Condicion',
+    'Estado',
+    'Cilindrada',
+    'Anio',
+    'Kilometraje',
+    'Precio_Contado',
+    'Mostrar_Precio',
+    'Entrega_Minima',
+    'Cuota_Desde',
+    'Destacada_Home',
+    'Oferta_Mes',
+    'Motor',
+    'Arranque',
+    'Freno_Delantero',
+    'Freno_Trasero',
+    'Imagen_URL',
+    'Descripcion',
+  ];
+
+  const exportarInventarioCSV = () => {
+    const rows = motos.map((m) => [
+      `"${m.id}"`,
+      `"${(m.titulo || '').replace(/"/g, '""')}"`,
+      `"${getMarcaNombre(m.marca_id)}"`,
+      `"${getCategoriaNombre(m.categoria_id)}"`,
+      m.condicion,
+      m.estado,
+      m.cilindrada,
+      m.anio,
+      m.kilometraje || 0,
+      m.precio_contado ?? '',
+      m.mostrar_precio ? 'SI' : 'NO',
+      m.entrega_minima ?? '',
+      m.cuota_desde ?? '',
+      m.destacada ? 'SI' : 'NO',
+      m.oferta_mes ? 'SI' : 'NO',
+      `"${(m.ficha_tecnica?.motor || '4 tiempos').replace(/"/g, '""')}"`,
+      `"${(m.ficha_tecnica?.arranque || 'Eléctrico y patada').replace(/"/g, '""')}"`,
+      `"${(m.ficha_tecnica?.freno_delantero || 'Disco').replace(/"/g, '""')}"`,
+      `"${(m.ficha_tecnica?.freno_trasero || 'Tambor').replace(/"/g, '""')}"`,
+      `"${m.imagen_portada || ''}"`,
+      `"${(m.descripcion || '').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      '\uFEFF' +
+      [INVENTARIO_CSV_HEADERS.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `elohim-motos-inventario-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
+  const descargarPlantillaInventarioCSV = () => {
+    const exampleRows = [
+      [
+        '""',
+        '"Honda Wave 110S Base"',
+        '"Honda"',
+        '"Cub / 110cc"',
+        '0km',
+        'disponible',
+        110,
+        2026,
+        0,
+        2950000,
+        'SI',
+        420000,
+        135000,
+        'SI',
+        'NO',
+        '"4 tiempos monocilíndrico"',
+        '"Eléctrico y patada"',
+        '"Tambor"',
+        '"Tambor"',
+        '"https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80"',
+        '"Entrega inmediata solo con DNI. Aceptamos tu moto usada en parte de pago."',
+      ],
+      [
+        '""',
+        '"Yamaha FZ-S FI 3.0 150"',
+        '"Yamaha"',
+        '"Street / Calle"',
+        '0km',
+        'disponible',
+        150,
+        2026,
+        0,
+        5490000,
+        'SI',
+        850000,
+        225000,
+        'SI',
+        'SI',
+        '"4 tiempos Blue Core Inyección"',
+        '"Eléctrico"',
+        '"Disco ABS"',
+        '"Disco"',
+        '"https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1000&q=80"',
+        '"Garantía oficial Yamaha. Financiación con DNI y Cuota Simple."',
+      ],
+    ];
+
+    const csvContent =
+      '\uFEFF' +
+      [INVENTARIO_CSV_HEADERS.join(';'), ...exampleRows.map((r) => r.join(';'))].join(
+        '\n'
+      );
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'plantilla-carga-masiva-elohim-motos.csv';
+    a.click();
+  };
+
+  const splitCsvLine = (line: string, delimiter: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === delimiter && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const parseCleanNumber = (raw: string | undefined): number | null => {
+    if (!raw) return null;
+    const cleaned = raw.replace(/[^0-9]/g, '');
+    if (!cleaned) return null;
+    return Number(cleaned);
+  };
+
+  const parseYesNo = (raw: string | undefined, defaultVal: boolean): boolean => {
+    if (!raw) return defaultVal;
+    const norm = raw.trim().toLowerCase();
+    if (['si', 'sí', 'true', '1', 'yes', 'visible', 'activa'].includes(norm)) return true;
+    if (['no', 'false', '0', 'oculta'].includes(norm)) return false;
+    return defaultVal;
+  };
+
+  const handleFileImportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setImportError('');
+    setImportSuccessMsg('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = String(event.target?.result || '').replace(/^\uFEFF/, '');
+        const lines = text
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+
+        if (lines.length < 2) {
+          setImportError(
+            'El archivo está vacío o no contiene filas de datos debajo del encabezado.'
+          );
+          setImportPreviewRows([]);
+          return;
+        }
+
+        // Auto-detectar separador (; de Excel en español, , o tabulación)
+        const headerLine = lines[0];
+        const semicolonCount = (headerLine.match(/;/g) || []).length;
+        const tabCount = (headerLine.match(/\t/g) || []).length;
+        const commaCount = (headerLine.match(/,/g) || []).length;
+        const delimiter =
+          semicolonCount >= commaCount && semicolonCount >= tabCount
+            ? ';'
+            : tabCount > commaCount
+            ? '\t'
+            : ',';
+
+        const headers = splitCsvLine(headerLine, delimiter).map((h) =>
+          h
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '')
+        );
+
+        const getCol = (cols: string[], possibleNames: string[]): string => {
+          for (const name of possibleNames) {
+            const idx = headers.findIndex((h) => h === name || h.includes(name));
+            if (idx !== -1 && cols[idx] !== undefined) {
+              return cols[idx].replace(/^"|"$/g, '').trim();
+            }
+          }
+          return '';
+        };
+
+        const parsedRows: Array<{
+          payload: Omit<Moto, 'id' | 'created_at' | 'updated_at'> & { id?: string };
+          marcaLabel: string;
+          categoriaLabel: string;
+          isUpdate: boolean;
+        }> = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = splitCsvLine(lines[i], delimiter);
+          const rowTitulo = getCol(cols, ['titulo', 'modelo', 'nombre', 'moto', 'unidad']);
+          if (!rowTitulo) continue;
+
+          const rowId = getCol(cols, ['id']);
+          const rawMarca = getCol(cols, ['marca']);
+          const rawCat = getCol(cols, ['categoria', 'tipo', 'segmento']);
+          const rawCondicion = getCol(cols, ['condicion']).toLowerCase();
+          const rawEstado = getCol(cols, ['estado']).toLowerCase();
+
+          // Resolver Marca
+          const matchedMarca =
+            marcas.find(
+              (m) =>
+                m.nombre.toLowerCase() === rawMarca.toLowerCase() ||
+                m.slug.toLowerCase() === rawMarca.toLowerCase()
+            ) ||
+            marcas.find((m) =>
+              rowTitulo.toLowerCase().includes(m.nombre.toLowerCase())
+            ) ||
+            marcas[0];
+
+          // Resolver Categoría
+          const matchedCat =
+            categorias.find(
+              (c) =>
+                c.nombre.toLowerCase() === rawCat.toLowerCase() ||
+                c.slug.toLowerCase() === rawCat.toLowerCase() ||
+                (rawCat && c.nombre.toLowerCase().includes(rawCat.toLowerCase()))
+            ) || categorias[0];
+
+          const rowCondicion: CondicionMoto =
+            rawCondicion === 'usada' || rawCondicion === 'usado' ? 'usada' : '0km';
+
+          const rowEstado: EstadoMoto = ['disponible', 'reservada', 'vendida', 'pausada'].includes(
+            rawEstado
+          )
+            ? (rawEstado as EstadoMoto)
+            : 'disponible';
+
+          const rowCilindrada = parseCleanNumber(getCol(cols, ['cilindrada', 'cc'])) || 110;
+          const rowAnio = parseCleanNumber(getCol(cols, ['anio', 'ano'])) || 2026;
+          const rowKm =
+            rowCondicion === '0km'
+              ? 0
+              : parseCleanNumber(getCol(cols, ['kilometraje', 'km'])) || 0;
+
+          const rowPrecio = parseCleanNumber(getCol(cols, ['preciocontado', 'precio']));
+          const rowMostrarPrecio = parseYesNo(getCol(cols, ['mostrarprecio', 'visible']), true);
+          const rowEntrega = parseCleanNumber(getCol(cols, ['entregaminima', 'anticipo', 'entrega']));
+          const rowCuota = parseCleanNumber(getCol(cols, ['cuotadesde', 'cuota']));
+          const rowDestacada = parseYesNo(getCol(cols, ['destacada', 'home']), false);
+          const rowOferta = parseYesNo(getCol(cols, ['oferta', 'ofertames']), false);
+
+          const rowMotor = getCol(cols, ['motor']) || '4 tiempos monocilíndrico';
+          const rowArranque = getCol(cols, ['arranque']) || 'Eléctrico y patada';
+          const rowFrenoDel = getCol(cols, ['frenodelantero', 'frenodel']) || 'Disco';
+          const rowFrenoTras = getCol(cols, ['frenotrasero', 'frenotras']) || 'Tambor';
+          const rowImagen =
+            getCol(cols, ['imagenurl', 'imagen', 'foto', 'url']) ||
+            'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80';
+          const rowDesc =
+            getCol(cols, ['descripcion', 'detalle']) ||
+            'Entrega inmediata solo con DNI. Aceptamos tu moto usada en parte de pago.';
+
+          const generatedSlug = `${slugify(rowTitulo)}-${rowCondicion}-${rowAnio}`;
+
+          const isUpdate = motos.some(
+            (existing) =>
+              (rowId && existing.id === rowId) ||
+              existing.slug === generatedSlug ||
+              (existing.titulo.trim().toLowerCase() === rowTitulo.trim().toLowerCase() &&
+                existing.condicion === rowCondicion &&
+                existing.anio === rowAnio)
+          );
+
+          parsedRows.push({
+            payload: {
+              id: rowId || undefined,
+              titulo: rowTitulo,
+              slug: generatedSlug,
+              marca_id: matchedMarca.id,
+              categoria_id: matchedCat.id,
+              condicion: rowCondicion,
+              estado: rowEstado,
+              cilindrada: rowCilindrada,
+              anio: rowAnio,
+              kilometraje: rowKm,
+              precio_contado: rowPrecio,
+              moneda: 'ARS',
+              mostrar_precio: rowMostrarPrecio,
+              entrega_minima: rowEntrega,
+              cuota_desde: rowCuota,
+              acepta_permuta: true,
+              financiacion_dni: true,
+              ficha_tecnica: {
+                motor: rowMotor,
+                arranque: rowArranque,
+                freno_delantero: rowFrenoDel,
+                freno_trasero: rowFrenoTras,
+                colores: ['Rojo', 'Negro', 'Blanco'],
+              },
+              descripcion: rowDesc,
+              imagen_portada: rowImagen,
+              galeria_imagenes: [rowImagen],
+              destacada: rowDestacada,
+              oferta_mes: rowOferta,
+            },
+            marcaLabel: matchedMarca.nombre,
+            categoriaLabel: matchedCat.nombre,
+            isUpdate,
+          });
+        }
+
+        if (parsedRows.length === 0) {
+          setImportError(
+            'No se encontraron filas válidas con columna "Titulo". Descargá la plantilla de ejemplo para verificar el formato.'
+          );
+          setImportPreviewRows([]);
+          return;
+        }
+
+        setImportPreviewRows(parsedRows);
+      } catch {
+        setImportError('No se pudo leer el archivo. Asegurate de subir un archivo .CSV válido.');
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const handleConfirmImportMasivo = async () => {
+    if (importPreviewRows.length === 0) return;
+    setIsImporting(true);
+    setImportError('');
+    try {
+      const items = importPreviewRows.map((r) => r.payload);
+      const res = await importMotosMasivo(items, importModo);
+      setImportSuccessMsg(
+        `¡Importación completada! ${res.insertadas} motos nuevas agregadas y ${res.actualizadas} unidades actualizadas.`
+      );
+      setImportPreviewRows([]);
+    } catch {
+      setImportError('Ocurrió un error al importar el inventario.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -385,7 +777,7 @@ export default function AdminDashboardPage() {
 
             <div>
               <label className="block text-[11px] font-extrabold uppercase tracking-wider text-neutral-400 mb-1.5">
-                Clave de Acceso Administrador
+                Clave de Acceso
               </label>
               <input
                 type="password"
@@ -396,10 +788,6 @@ export default function AdminDashboardPage() {
                 placeholder="Ingresá tu clave..."
                 className="w-full h-12 px-4 rounded-xl bg-neutral-950 border border-neutral-700 text-sm font-bold text-white focus:outline-none focus:border-red-600"
               />
-              <span className="block text-[11px] text-neutral-500 mt-1.5">
-                Clave activa: <code className="text-red-400 font-bold">elohim2026</code> (o{' '}
-                <code className="text-neutral-300">1234</code>)
-              </span>
             </div>
 
             <button
@@ -616,6 +1004,42 @@ export default function AdminDashboardPage() {
         =================================================================== */}
         {activeTab === 'inventario' && (
           <div className="pt-6 space-y-4">
+            {/* Barra de Acciones de Inventario: Exportar e Importar Masivo en Excel */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-neutral-200 shadow-sm">
+              <div>
+                <h2 className="font-black text-neutral-950 text-base flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                  <span>Gestión Masiva de Catálogo y Lista de Precios (Excel / CSV)</span>
+                </h2>
+                <p className="text-xs text-neutral-500">
+                  Exportá el inventario a Excel para editar precios masivamente o importá una planilla para dar de alta varias motos a la vez.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={exportarInventarioCSV}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Exportar Inventario Excel (.CSV)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportError('');
+                    setImportSuccessMsg('');
+                    setImportPreviewRows([]);
+                    setIsImportModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-neutral-950 hover:bg-red-600 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Importar Masivo (Excel / CSV)</span>
+                </button>
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -1528,6 +1952,249 @@ export default function AdminDashboardPage() {
       {/* Modal Generador de Story / Ficha WA */}
       {storyMoto && (
         <StoryGeneratorModal moto={storyMoto} onClose={() => setStoryMoto(null)} />
+      )}
+
+      {/* =====================================================================
+          MODAL DE IMPORTACIÓN MASIVA DE INVENTARIO (EXCEL / CSV)
+      ===================================================================== */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full border border-neutral-200 shadow-2xl overflow-hidden my-8">
+            {/* Header */}
+            <div className="bg-neutral-950 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="font-black text-base">
+                    Carga y Actualización Masiva de Inventario (Excel / CSV)
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Subí tu archivo .CSV guardado desde Excel para cargar motos nuevas o actualizar precios de todo el salón
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+              {/* Paso 1: Descargar Plantilla o Inventario Actual */}
+              <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-red-600">
+                    Paso 1 • Formato de Planilla
+                  </span>
+                  <p className="text-xs text-neutral-700 font-medium">
+                    ¿Querés actualizar precios del stock actual o cargar motos desde cero? Descargá la base que prefieras, editala en Excel y guardala como <strong>CSV (delimitado por comas o punto y coma)</strong>.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={descargarPlantillaInventarioCSV}
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border border-neutral-300 font-bold text-xs flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5 text-red-600" />
+                    <span>Descargar Plantilla Ejemplo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportarInventarioCSV}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Exportar Stock Actual ({motos.length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Paso 2: Modo de Importación + Selección de Archivo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl border border-neutral-200 space-y-2.5">
+                  <label className="block text-xs font-extrabold uppercase text-neutral-700">
+                    Paso 2 • Modo de Importación
+                  </label>
+                  <label className="flex items-start gap-2.5 text-xs cursor-pointer p-2 rounded-xl hover:bg-neutral-50">
+                    <input
+                      type="radio"
+                      name="importModo"
+                      checked={importModo === 'merge'}
+                      onChange={() => setImportModo('merge')}
+                      className="accent-red-600 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-black text-neutral-950 block">
+                        Actualizar existentes + Agregar nuevas (Recomendado)
+                      </span>
+                      <span className="text-neutral-500">
+                        Si la moto ya existe (mismo ID o Título/Año), actualiza su precio, cuota y estado. Si no existe, la crea.
+                      </span>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2.5 text-xs cursor-pointer p-2 rounded-xl hover:bg-neutral-50">
+                    <input
+                      type="radio"
+                      name="importModo"
+                      checked={importModo === 'replace'}
+                      onChange={() => setImportModo('replace')}
+                      className="accent-red-600 mt-0.5"
+                    />
+                    <div>
+                      <span className="font-black text-neutral-950 block">
+                        Reemplazar todo el inventario actual
+                      </span>
+                      <span className="text-neutral-500">
+                        Borra el listado actual y deja únicamente las motos que estén en el archivo Excel/CSV.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="p-4 rounded-2xl border-2 border-dashed border-neutral-300 hover:border-red-500 transition-colors flex flex-col justify-center items-center text-center space-y-2 bg-neutral-50/60">
+                  <Upload className="w-8 h-8 text-red-600" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-black text-neutral-900">
+                      Paso 3 • Seleccioná tu archivo Excel (.CSV)
+                    </p>
+                    <p className="text-[11px] text-neutral-500">
+                      Soporta archivos .CSV separados por punto y coma (;), coma (,) o tabulación
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    onChange={handleFileImportChange}
+                    className="mt-2 block w-full text-xs text-neutral-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-neutral-950 file:text-white hover:file:bg-red-600 file:cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Mensajes de Error o Éxito */}
+              {importError && (
+                <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center gap-2.5">
+                  <AlertCircle className="w-5 h-5 shrink-0 text-red-600" />
+                  <span>{importError}</span>
+                </div>
+              )}
+
+              {importSuccessMsg && (
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
+                    <span>{importSuccessMsg}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsImportModalOpen(false)}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white font-black uppercase text-[11px]"
+                  >
+                    Ver Inventario
+                  </button>
+                </div>
+              )}
+
+              {/* Vista Previa de las Filas Detectadas */}
+              {importPreviewRows.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-neutral-700">
+                      Vista Previa de Importación ({importPreviewRows.length} unidades detectadas)
+                    </h4>
+                    <div className="flex items-center gap-2 text-xs font-bold">
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        +{importPreviewRows.filter((r) => !r.isUpdate).length} Nuevas
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                        ↻ {importPreviewRows.filter((r) => r.isUpdate).length} Para Actualizar
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border border-neutral-200 rounded-2xl overflow-hidden max-h-64 overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-neutral-900 text-white uppercase text-[10px] font-extrabold tracking-wider">
+                          <th className="py-2.5 px-3">Acción</th>
+                          <th className="py-2.5 px-3">Título / Modelo</th>
+                          <th className="py-2.5 px-3">Marca / Cat</th>
+                          <th className="py-2.5 px-3">Condición</th>
+                          <th className="py-2.5 px-3">Precio Contado</th>
+                          <th className="py-2.5 px-3">Cuota Desde</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-200">
+                        {importPreviewRows.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-neutral-50">
+                            <td className="py-2 px-3">
+                              {importModo === 'replace' ? (
+                                <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 font-black text-[10px] uppercase">
+                                  Reemplazo
+                                </span>
+                              ) : row.isUpdate ? (
+                                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-black text-[10px] uppercase">
+                                  Actualizar
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-black text-[10px] uppercase">
+                                  Nueva
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 font-bold text-neutral-950">
+                              {row.payload.titulo} ({row.payload.anio})
+                            </td>
+                            <td className="py-2 px-3 text-neutral-600">
+                              {row.marcaLabel} • {row.categoriaLabel}
+                            </td>
+                            <td className="py-2 px-3 uppercase font-bold">
+                              {row.payload.condicion} ({row.payload.cilindrada}cc)
+                            </td>
+                            <td className="py-2 px-3 font-black text-neutral-900">
+                              {formatCurrency(row.payload.precio_contado, 'ARS')}
+                            </td>
+                            <td className="py-2 px-3 text-neutral-700 font-semibold">
+                              {row.payload.cuota_desde
+                                ? formatCurrency(row.payload.cuota_desde, 'ARS')
+                                : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-200 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-neutral-200 hover:bg-neutral-300 text-neutral-800 font-bold text-xs uppercase"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                disabled={importPreviewRows.length === 0 || isImporting}
+                onClick={handleConfirmImportMasivo}
+                className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-red-600/20 transition-all"
+              >
+                <Upload className="w-4 h-4" />
+                <span>
+                  {isImporting
+                    ? 'Sincronizando con Base de Datos...'
+                    : `Confirmar Importación (${importPreviewRows.length} motos)`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

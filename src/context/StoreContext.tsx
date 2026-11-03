@@ -53,6 +53,10 @@ interface StoreContextType {
   toggleDestacadaMoto: (id: string) => Promise<void>;
   toggleOfertaMesMoto: (id: string) => Promise<void>;
   toggleAllPrecios: (mostrar: boolean) => Promise<void>;
+  importMotosMasivo: (
+    items: Array<Omit<Moto, 'id' | 'created_at' | 'updated_at'> & { id?: string }>,
+    modo: 'merge' | 'replace'
+  ) => Promise<{ insertadas: number; actualizadas: number }>;
   addLeadFinanciacion: (
     lead: Omit<LeadFinanciacion, 'id' | 'estado' | 'vendedor_asignado_id' | 'notas_internas' | 'created_at' | 'updated_at'>
   ) => Promise<{ lead: LeadFinanciacion; vendedor: Vendedor | null }>;
@@ -392,9 +396,128 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const toggleAllPrecios = async (mostrar: boolean) => {
     if (isSupabaseConfigured && supabase) {
-      await supabase.from('motos').update({ mostrar_precio: mostrar }).neq('id', '');
+      await supabase.from('motos').update({ mostrar_precio: mostrar }).neq('slug', '__none__');
     }
     setMotos((prev) => prev.map((m) => ({ ...m, mostrar_precio: mostrar })));
+  };
+
+  const importMotosMasivo = async (
+    items: Array<Omit<Moto, 'id' | 'created_at' | 'updated_at'> & { id?: string }>,
+    modo: 'merge' | 'replace'
+  ): Promise<{ insertadas: number; actualizadas: number }> => {
+    const now = new Date().toISOString();
+
+    if (modo === 'replace') {
+      const seenSlugs = new Set<string>();
+      const prepared = items.map((item, idx) => {
+        let finalSlug = item.slug || `moto-${idx}-${Date.now()}`;
+        if (seenSlugs.has(finalSlug)) {
+          finalSlug = `${finalSlug}-${idx + 1}`;
+        }
+        seenSlugs.add(finalSlug);
+        return {
+          ...item,
+          slug: finalSlug,
+        };
+      });
+
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('motos').delete().neq('slug', '__none__');
+        const payloadToInsert = prepared.map(({ id: _unusedId, ...rest }) => rest);
+        const { data: inserted } = await supabase
+          .from('motos')
+          .insert(payloadToInsert)
+          .select('*');
+        if (inserted?.length) {
+          setMotos(inserted);
+          return { insertadas: inserted.length, actualizadas: 0 };
+        }
+      }
+
+      const localList: Moto[] = prepared.map((item, idx) => ({
+        ...item,
+        id: item.id || `moto-${Date.now()}-${idx}`,
+        created_at: now,
+        updated_at: now,
+      }));
+      setMotos(localList);
+      return { insertadas: localList.length, actualizadas: 0 };
+    }
+
+    // Modo 'merge': Actualizar existentes + Agregar nuevas
+    let insertadas = 0;
+    let actualizadas = 0;
+    const currentMotos = [...motos];
+    const toInsert: Array<Omit<Moto, 'id' | 'created_at' | 'updated_at'>> = [];
+    const seenSlugs = new Set<string>(currentMotos.map((m) => m.slug));
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const existingIndex = currentMotos.findIndex(
+        (m) =>
+          (item.id && m.id === item.id) ||
+          m.slug === item.slug ||
+          (m.titulo.trim().toLowerCase() === item.titulo.trim().toLowerCase() &&
+            m.condicion === item.condicion &&
+            m.anio === item.anio)
+      );
+
+      if (existingIndex !== -1) {
+        const existing = currentMotos[existingIndex];
+        const updatedMoto: Moto = {
+          ...existing,
+          ...item,
+          id: existing.id,
+          slug: existing.slug,
+          created_at: existing.created_at,
+          updated_at: now,
+        };
+        currentMotos[existingIndex] = updatedMoto;
+        actualizadas++;
+
+        if (isSupabaseConfigured && supabase) {
+          const { id: _id, created_at: _c, ...updatePayload } = updatedMoto;
+          await supabase.from('motos').update(updatePayload).eq('id', existing.id);
+        }
+      } else {
+        let uniqueSlug = item.slug;
+        if (seenSlugs.has(uniqueSlug)) {
+          uniqueSlug = `${uniqueSlug}-${Date.now().toString().slice(-4)}-${i}`;
+        }
+        seenSlugs.add(uniqueSlug);
+        const { id: _unusedId, ...cleanNew } = item;
+        toInsert.push({
+          ...cleanNew,
+          slug: uniqueSlug,
+        });
+        insertadas++;
+      }
+    }
+
+    if (toInsert.length > 0) {
+      if (isSupabaseConfigured && supabase) {
+        const { data: insertedRows } = await supabase
+          .from('motos')
+          .insert(toInsert)
+          .select('*');
+        if (insertedRows?.length) {
+          setMotos([...insertedRows, ...currentMotos]);
+          return { insertadas: insertedRows.length, actualizadas };
+        }
+      }
+
+      const localInserted: Moto[] = toInsert.map((item, idx) => ({
+        ...item,
+        id: `moto-${Date.now()}-${idx}`,
+        created_at: now,
+        updated_at: now,
+      }));
+      setMotos([...localInserted, ...currentMotos]);
+    } else {
+      setMotos(currentMotos);
+    }
+
+    return { insertadas, actualizadas };
   };
 
   const addLeadFinanciacion = async (
@@ -586,6 +709,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         toggleDestacadaMoto,
         toggleOfertaMesMoto,
         toggleAllPrecios,
+        importMotosMasivo,
         addLeadFinanciacion,
         updateLeadFinanciacion,
         addLeadPermuta,
