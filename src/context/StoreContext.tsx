@@ -87,6 +87,13 @@ const STORAGE_KEYS = {
   ROTACION_IDX: 'elohim_wa_rotacion_idx_v1',
 };
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUuid(value: string | null | undefined): boolean {
+  return Boolean(value && UUID_REGEX.test(value));
+}
+
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [motos, setMotos] = useState<Moto[]>(INITIAL_MOTOS);
   const [marcas, setMarcas] = useState<Marca[]>(INITIAL_MARCAS);
@@ -145,7 +152,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
           if (dbMarcas?.length) setMarcas(dbMarcas);
           if (dbCategorias?.length) setCategorias(dbCategorias);
-          if (dbMotos?.length) setMotos(dbMotos);
+
+          if (dbMotos?.length) {
+            setMotos(dbMotos);
+          } else if (dbMarcas?.length && dbCategorias?.length) {
+            // Si la tabla motos en Supabase recién fue creada y está vacía,
+            // mapeamos los IDs de marcas y categorías del seed a los UUIDs reales de Supabase
+            const mappedInitialMotos = INITIAL_MOTOS.map((m) => {
+              const seedMarcaSlug = m.marca_id.replace(/^m-/, '');
+              const seedCatSlug = m.categoria_id.replace(/^c-/, '');
+              const realMarca =
+                dbMarcas.find((dm: Marca) => dm.slug === seedMarcaSlug) || dbMarcas[0];
+              const realCat =
+                dbCategorias.find((dc: Categoria) => dc.slug === seedCatSlug) ||
+                dbCategorias[0];
+              return {
+                ...m,
+                marca_id: realMarca.id,
+                categoria_id: realCat.id,
+              };
+            });
+
+            // Intentamos poblar automáticamente las 13 motos iniciales en Supabase
+            const payloadToInsert = mappedInitialMotos.map(
+              ({ id: _id, created_at: _c, updated_at: _u, ...rest }) => rest
+            );
+            const { data: insertedMotos } = await supabase
+              .from('motos')
+              .insert(payloadToInsert)
+              .select('*');
+
+            if (insertedMotos?.length) {
+              setMotos(insertedMotos);
+            } else {
+              setMotos(mappedInitialMotos);
+            }
+          }
+
           if (dbVendedores?.length) setVendedores(dbVendedores);
           if (dbLeadsFin) setLeadsFinanciacion(dbLeadsFin);
           if (dbLeadsPerm) setLeadsPermutas(dbLeadsPerm);
@@ -262,8 +305,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updated_at: now,
       };
       if (isSupabaseConfigured && supabase) {
-        const { data } = await supabase.from('motos').insert([motoData]).select().single();
-        if (data) created.id = data.id;
+        const { id: _unusedId, ...insertPayload } = motoData;
+        const { data } = await supabase
+          .from('motos')
+          .insert([insertPayload])
+          .select()
+          .single();
+        if (data) {
+          setMotos((prev) => [data, ...prev]);
+          return data;
+        }
       }
       setMotos((prev) => [created, ...prev]);
       return created;
@@ -354,9 +405,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             situacion_laboral: newLead.situacion_laboral,
             ingreso_aproximado: newLead.ingreso_aproximado,
             anticipo_disponible: newLead.anticipo_disponible,
-            moto_interes_id: newLead.moto_interes_id,
+            moto_interes_id: isValidUuid(newLead.moto_interes_id)
+              ? newLead.moto_interes_id
+              : null,
             moto_interes_titulo: newLead.moto_interes_titulo,
-            vendedor_asignado_id: newLead.vendedor_asignado_id,
+            vendedor_asignado_id: isValidUuid(newLead.vendedor_asignado_id)
+              ? newLead.vendedor_asignado_id
+              : null,
             notas_internas: newLead.notas_internas,
             acepto_terminos_legales: newLead.acepto_terminos_legales,
           },
@@ -416,7 +471,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             detalles_estado: newLead.detalles_estado,
             fotos_usada: newLead.fotos_usada,
             valor_pretendido: newLead.valor_pretendido,
-            moto_interes_id: newLead.moto_interes_id,
+            moto_interes_id: isValidUuid(newLead.moto_interes_id)
+              ? newLead.moto_interes_id
+              : null,
             moto_interes_titulo: newLead.moto_interes_titulo,
           },
         ])

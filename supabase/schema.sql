@@ -204,26 +204,13 @@ ALTER TABLE vendedores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leads_financiacion ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leads_permutas ENABLE ROW LEVEL SECURITY;
 
--- Políticas de LECTURA PÚBLICA (Cualquier visitante puede ver el catálogo)
-CREATE POLICY "Lectura pública de marcas" ON marcas FOR SELECT USING (true);
-CREATE POLICY "Lectura pública de categorias" ON categorias FOR SELECT USING (true);
-CREATE POLICY "Lectura pública de motos activas" ON motos FOR SELECT USING (estado != 'pausada');
-CREATE POLICY "Lectura pública de vendedores activos" ON vendedores FOR SELECT USING (activo = true);
-
--- Políticas de INSERCIÓN PÚBLICA (Los clientes pueden enviar formularios sin estar logueados)
-CREATE POLICY "Clientes pueden enviar solicitud de financiacion" 
-    ON leads_financiacion FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Clientes pueden enviar solicitud de permuta" 
-    ON leads_permutas FOR INSERT WITH CHECK (true);
-
--- Políticas de ADMINISTRADOR (Usuarios autenticados en Supabase Auth tienen control total)
-CREATE POLICY "Admin control total marcas" ON marcas FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Admin control total categorias" ON categorias FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Admin control total motos" ON motos FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Admin control total vendedores" ON vendedores FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Admin control total financiacion" ON leads_financiacion FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Admin control total permutas" ON leads_permutas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Políticas de LECTURA Y GESTIÓN DESDE EL PANEL (Permite lectura y carga desde el Backoffice)
+CREATE POLICY "Acceso total marcas" ON marcas FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso total categorias" ON categorias FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso total motos" ON motos FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso total vendedores" ON vendedores FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso total financiacion" ON leads_financiacion FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Acceso total permutas" ON leads_permutas FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================================================
 -- 6. DATOS INICIALES (Seed de Marcas, Categorías y Vendedores en Argentina)
