@@ -45,6 +45,11 @@ import {
   slugify,
 } from '@/lib/format';
 import { getTrackingEventsLog, TrackingEventLog } from '@/lib/analytics';
+import {
+  downloadExcelWorkbook,
+  ExcelColumnSpec,
+  parseExcelWorkbook,
+} from '@/lib/excel';
 import StoryGeneratorModal from '@/components/StoryGeneratorModal';
 
 export default function AdminDashboardPage() {
@@ -271,91 +276,84 @@ export default function AdminDashboardPage() {
   };
 
   // =========================================================================
-  // EXPORTACIÓN A EXCEL / CSV (MINI CRM)
+  // EXPORTACIÓN A EXCEL NATIVO .XLSX (MINI CRM)
   // =========================================================================
   const exportarFinanciacionCSV = () => {
-    const headers = [
-      'Fecha',
-      'Nombre Completo',
-      'DNI / CUIL',
-      'Telefono WhatsApp',
-      'Localidad',
-      'Situacion Laboral',
-      'Anticipo Disponible',
-      'Ingreso Aprox',
-      'Moto de Interes',
-      'Estado',
-      'Notas Internas',
+    const columns: ExcelColumnSpec[] = [
+      { header: 'Fecha', width: 14 },
+      { header: 'Nombre Completo', width: 26 },
+      { header: 'DNI / CUIL', width: 16 },
+      { header: 'Telefono WhatsApp', width: 18 },
+      { header: 'Localidad', width: 20 },
+      { header: 'Situacion Laboral', width: 24 },
+      { header: 'Anticipo Disponible', width: 18 },
+      { header: 'Ingreso Aprox', width: 16 },
+      { header: 'Moto de Interes', width: 28 },
+      { header: 'Estado', width: 16 },
+      { header: 'Notas Internas', width: 36 },
     ];
     const rows = leadsFinanciacion.map((l) => [
       new Date(l.created_at).toLocaleDateString('es-AR'),
-      `"${l.nombre_completo}"`,
-      `"${l.dni_cuil}"`,
-      `"${l.telefono}"`,
-      `"${l.localidad}"`,
-      `"${SITUACION_LABORAL_LABELS[l.situacion_laboral]}"`,
+      l.nombre_completo,
+      l.dni_cuil,
+      l.telefono,
+      l.localidad,
+      SITUACION_LABORAL_LABELS[l.situacion_laboral],
       l.anticipo_disponible || 0,
       l.ingreso_aproximado || 0,
-      `"${l.moto_interes_titulo}"`,
+      l.moto_interes_titulo || 'Consulta General',
       l.estado,
-      `"${(l.notas_internas || '').replace(/"/g, '""')}"`,
+      l.notas_internas || '',
     ]);
 
-    const csvContent =
-      '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `elohim-motos-leads-financiacion-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
-    a.click();
+    downloadExcelWorkbook(
+      `elohim-motos-leads-financiacion-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'Financiacion DNI',
+      columns,
+      rows
+    );
   };
 
   const exportarPermutasCSV = () => {
-    const headers = [
-      'Fecha',
-      'Cliente',
-      'Telefono',
-      'Marca Usada',
-      'Modelo Usado',
-      'Anio',
-      'Kilometraje',
-      'Papeles al Dia',
-      'Valor Pretendido',
-      'Moto a Retirar',
-      'Estado',
-      'Notas Tasacion',
+    const columns: ExcelColumnSpec[] = [
+      { header: 'Fecha', width: 14 },
+      { header: 'Cliente', width: 24 },
+      { header: 'Telefono', width: 18 },
+      { header: 'Marca Usada', width: 16 },
+      { header: 'Modelo Usado', width: 22 },
+      { header: 'Anio', width: 10 },
+      { header: 'Kilometraje', width: 14 },
+      { header: 'Papeles al Dia', width: 14 },
+      { header: 'Valor Pretendido', width: 18 },
+      { header: 'Moto a Retirar', width: 28 },
+      { header: 'Estado', width: 16 },
+      { header: 'Notas Tasacion', width: 34 },
     ];
     const rows = leadsPermutas.map((l) => [
       new Date(l.created_at).toLocaleDateString('es-AR'),
-      `"${l.cliente_nombre}"`,
-      `"${l.cliente_telefono}"`,
-      `"${l.marca_ofrecida}"`,
-      `"${l.modelo_ofrecido}"`,
+      l.cliente_nombre,
+      l.cliente_telefono,
+      l.marca_ofrecida,
+      l.modelo_ofrecido,
       l.anio_ofrecido,
       l.kilometraje_aprox,
       l.papeles_al_dia ? 'SI' : 'NO',
       l.valor_pretendido || 0,
-      `"${l.moto_interes_titulo}"`,
+      l.moto_interes_titulo || 'A elección',
       l.estado,
-      `"${(l.notas_tasacion || '').replace(/"/g, '""')}"`,
+      l.notas_tasacion || '',
     ]);
 
-    const csvContent =
-      '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `elohim-motos-leads-permutas-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
-    a.click();
+    downloadExcelWorkbook(
+      `elohim-motos-leads-permutas-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'Toma de Usados',
+      columns,
+      rows
+    );
   };
 
   // =========================================================================
-  // EXPORTACIÓN E IMPORTACIÓN MASIVA DE INVENTARIO (EXCEL / CSV)
+  // EXPORTACIÓN E IMPORTACIÓN MASIVA DE INVENTARIO (EXCEL NATIVO .XLSX Y .CSV)
   // =========================================================================
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importModo, setImportModo] = useState<'merge' | 'replace'>('merge');
@@ -371,36 +369,36 @@ export default function AdminDashboardPage() {
   const [importSuccessMsg, setImportSuccessMsg] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
-  const INVENTARIO_CSV_HEADERS = [
-    'ID',
-    'Titulo',
-    'Marca',
-    'Categoria',
-    'Condicion',
-    'Estado',
-    'Cilindrada',
-    'Anio',
-    'Kilometraje',
-    'Precio_Contado',
-    'Mostrar_Precio',
-    'Entrega_Minima',
-    'Cuota_Desde',
-    'Destacada_Home',
-    'Oferta_Mes',
-    'Motor',
-    'Arranque',
-    'Freno_Delantero',
-    'Freno_Trasero',
-    'Imagen_URL',
-    'Descripcion',
+  const INVENTARIO_EXCEL_COLUMNS: ExcelColumnSpec[] = [
+    { header: 'ID', width: 22 },
+    { header: 'Titulo', width: 34 },
+    { header: 'Marca', width: 16 },
+    { header: 'Categoria', width: 20 },
+    { header: 'Condicion', width: 12 },
+    { header: 'Estado', width: 14 },
+    { header: 'Cilindrada', width: 12 },
+    { header: 'Anio', width: 10 },
+    { header: 'Kilometraje', width: 14 },
+    { header: 'Precio_Contado', width: 18 },
+    { header: 'Mostrar_Precio', width: 16 },
+    { header: 'Entrega_Minima', width: 18 },
+    { header: 'Cuota_Desde', width: 16 },
+    { header: 'Destacada_Home', width: 16 },
+    { header: 'Oferta_Mes', width: 14 },
+    { header: 'Motor', width: 30 },
+    { header: 'Arranque', width: 22 },
+    { header: 'Freno_Delantero', width: 22 },
+    { header: 'Freno_Trasero', width: 22 },
+    { header: 'Imagen_URL', width: 38 },
+    { header: 'Descripcion', width: 48 },
   ];
 
   const exportarInventarioCSV = () => {
     const rows = motos.map((m) => [
-      `"${m.id}"`,
-      `"${(m.titulo || '').replace(/"/g, '""')}"`,
-      `"${getMarcaNombre(m.marca_id)}"`,
-      `"${getCategoriaNombre(m.categoria_id)}"`,
+      m.id,
+      m.titulo || '',
+      getMarcaNombre(m.marca_id),
+      getCategoriaNombre(m.categoria_id),
       m.condicion,
       m.estado,
       m.cilindrada,
@@ -412,31 +410,29 @@ export default function AdminDashboardPage() {
       m.cuota_desde ?? '',
       m.destacada ? 'SI' : 'NO',
       m.oferta_mes ? 'SI' : 'NO',
-      `"${(m.ficha_tecnica?.motor || '4 tiempos').replace(/"/g, '""')}"`,
-      `"${(m.ficha_tecnica?.arranque || 'Eléctrico y patada').replace(/"/g, '""')}"`,
-      `"${(m.ficha_tecnica?.freno_delantero || 'Disco').replace(/"/g, '""')}"`,
-      `"${(m.ficha_tecnica?.freno_trasero || 'Tambor').replace(/"/g, '""')}"`,
-      `"${m.imagen_portada || ''}"`,
-      `"${(m.descripcion || '').replace(/"/g, '""')}"`,
+      m.ficha_tecnica?.motor || '4 tiempos',
+      m.ficha_tecnica?.arranque || 'Eléctrico y patada',
+      m.ficha_tecnica?.freno_delantero || 'Disco',
+      m.ficha_tecnica?.freno_trasero || 'Tambor',
+      m.imagen_portada || '',
+      m.descripcion || '',
     ]);
 
-    const csvContent =
-      '\uFEFF' +
-      [INVENTARIO_CSV_HEADERS.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `elohim-motos-inventario-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    downloadExcelWorkbook(
+      `elohim-motos-inventario-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'Inventario Motos',
+      INVENTARIO_EXCEL_COLUMNS,
+      rows
+    );
   };
 
   const descargarPlantillaInventarioCSV = () => {
     const exampleRows = [
       [
-        '""',
-        '"Honda Wave 110S Base"',
-        '"Honda"',
-        '"Cub / 110cc"',
+        '',
+        'Honda Wave 110S Base',
+        'Honda',
+        'Cub / 110cc',
         '0km',
         'disponible',
         110,
@@ -448,18 +444,18 @@ export default function AdminDashboardPage() {
         135000,
         'SI',
         'NO',
-        '"4 tiempos monocilíndrico"',
-        '"Eléctrico y patada"',
-        '"Tambor"',
-        '"Tambor"',
-        '"https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80"',
-        '"Entrega inmediata solo con DNI. Aceptamos tu moto usada en parte de pago."',
+        '4 tiempos monocilíndrico',
+        'Eléctrico y patada',
+        'Tambor',
+        'Tambor',
+        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80',
+        'Entrega inmediata solo con DNI. Aceptamos tu moto usada en parte de pago.',
       ],
       [
-        '""',
-        '"Yamaha FZ-S FI 3.0 150"',
-        '"Yamaha"',
-        '"Street / Calle"',
+        '',
+        'Yamaha FZ-S FI 3.0 150',
+        'Yamaha',
+        'Street / Calle',
         '0km',
         'disponible',
         150,
@@ -471,25 +467,21 @@ export default function AdminDashboardPage() {
         225000,
         'SI',
         'SI',
-        '"4 tiempos Blue Core Inyección"',
-        '"Eléctrico"',
-        '"Disco ABS"',
-        '"Disco"',
-        '"https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1000&q=80"',
-        '"Garantía oficial Yamaha. Financiación con DNI y Cuota Simple."',
+        '4 tiempos Blue Core Inyección',
+        'Eléctrico',
+        'Disco ABS',
+        'Disco',
+        'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1000&q=80',
+        'Garantía oficial Yamaha. Financiación con DNI y Cuota Simple.',
       ],
     ];
 
-    const csvContent =
-      '\uFEFF' +
-      [INVENTARIO_CSV_HEADERS.join(';'), ...exampleRows.map((r) => r.join(';'))].join(
-        '\n'
-      );
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'plantilla-carga-masiva-elohim-motos.csv';
-    a.click();
+    downloadExcelWorkbook(
+      'plantilla-carga-masiva-elohim-motos.xlsx',
+      'Plantilla Inventario',
+      INVENTARIO_EXCEL_COLUMNS,
+      exampleRows
+    );
   };
 
   const splitCsvLine = (line: string, delimiter: string): string[] => {
@@ -518,7 +510,12 @@ export default function AdminDashboardPage() {
 
   const parseCleanNumber = (raw: string | undefined): number | null => {
     if (!raw) return null;
-    const cleaned = raw.replace(/[^0-9]/g, '');
+    // Si viene como número decimal de fórmula Excel (ej. "3150000.00"), redondeamos
+    const trimmed = raw.trim();
+    if (/^\d+(\.\d+)?$/.test(trimmed)) {
+      return Math.round(Number(trimmed));
+    }
+    const cleaned = trimmed.replace(/[^0-9]/g, '');
     if (!cleaned) return null;
     return Number(cleaned);
   };
@@ -531,195 +528,218 @@ export default function AdminDashboardPage() {
     return defaultVal;
   };
 
-  const handleFileImportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processRawMatrixIntoPreview = (matrix: string[][]) => {
+    if (matrix.length < 2) {
+      setImportError(
+        'El archivo está vacío o no contiene filas de datos debajo del encabezado.'
+      );
+      setImportPreviewRows([]);
+      return;
+    }
+
+    const headers = matrix[0].map((h) =>
+      String(h || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
+    );
+
+    const getCol = (cols: string[], possibleNames: string[]): string => {
+      for (const name of possibleNames) {
+        const idx = headers.findIndex((h) => h === name || h.includes(name));
+        if (idx !== -1 && cols[idx] !== undefined) {
+          return String(cols[idx]).replace(/^"|"$/g, '').trim();
+        }
+      }
+      return '';
+    };
+
+    const parsedRows: Array<{
+      payload: Omit<Moto, 'id' | 'created_at' | 'updated_at'> & { id?: string };
+      marcaLabel: string;
+      categoriaLabel: string;
+      isUpdate: boolean;
+    }> = [];
+
+    for (let i = 1; i < matrix.length; i++) {
+      const cols = matrix[i];
+      const rowTitulo = getCol(cols, ['titulo', 'modelo', 'nombre', 'moto', 'unidad']);
+      if (!rowTitulo) continue;
+
+      const rowId = getCol(cols, ['id']);
+      const rawMarca = getCol(cols, ['marca']);
+      const rawCat = getCol(cols, ['categoria', 'tipo', 'segmento']);
+      const rawCondicion = getCol(cols, ['condicion']).toLowerCase();
+      const rawEstado = getCol(cols, ['estado']).toLowerCase();
+
+      // Resolver Marca
+      const matchedMarca =
+        marcas.find(
+          (m) =>
+            m.nombre.toLowerCase() === rawMarca.toLowerCase() ||
+            m.slug.toLowerCase() === rawMarca.toLowerCase()
+        ) ||
+        marcas.find((m) =>
+          rowTitulo.toLowerCase().includes(m.nombre.toLowerCase())
+        ) ||
+        marcas[0];
+
+      // Resolver Categoría
+      const matchedCat =
+        categorias.find(
+          (c) =>
+            c.nombre.toLowerCase() === rawCat.toLowerCase() ||
+            c.slug.toLowerCase() === rawCat.toLowerCase() ||
+            (rawCat && c.nombre.toLowerCase().includes(rawCat.toLowerCase()))
+        ) || categorias[0];
+
+      const rowCondicion: CondicionMoto =
+        rawCondicion === 'usada' || rawCondicion === 'usado' ? 'usada' : '0km';
+
+      const rowEstado: EstadoMoto = ['disponible', 'reservada', 'vendida', 'pausada'].includes(
+        rawEstado
+      )
+        ? (rawEstado as EstadoMoto)
+        : 'disponible';
+
+      const rowCilindrada = parseCleanNumber(getCol(cols, ['cilindrada', 'cc'])) || 110;
+      const rowAnio = parseCleanNumber(getCol(cols, ['anio', 'ano'])) || 2026;
+      const rowKm =
+        rowCondicion === '0km'
+          ? 0
+          : parseCleanNumber(getCol(cols, ['kilometraje', 'km'])) || 0;
+
+      const rowPrecio = parseCleanNumber(getCol(cols, ['preciocontado', 'precio']));
+      const rowMostrarPrecio = parseYesNo(getCol(cols, ['mostrarprecio', 'visible']), true);
+      const rowEntrega = parseCleanNumber(getCol(cols, ['entregaminima', 'anticipo', 'entrega']));
+      const rowCuota = parseCleanNumber(getCol(cols, ['cuotadesde', 'cuota']));
+      const rowDestacada = parseYesNo(getCol(cols, ['destacada', 'home']), false);
+      const rowOferta = parseYesNo(getCol(cols, ['oferta', 'ofertames']), false);
+
+      const rowMotor = getCol(cols, ['motor']) || '4 tiempos monocilíndrico';
+      const rowArranque = getCol(cols, ['arranque']) || 'Eléctrico y patada';
+      const rowFrenoDel = getCol(cols, ['frenodelantero', 'frenodel']) || 'Disco';
+      const rowFrenoTras = getCol(cols, ['frenotrasero', 'frenotras']) || 'Tambor';
+      const rowImagen =
+        getCol(cols, ['imagenurl', 'imagen', 'foto', 'url']) ||
+        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80';
+      const rowDesc =
+        getCol(cols, ['descripcion', 'detalle']) ||
+        'Entrega inmediata solo con DNI. Aceptamos tu moto usada en parte de pago.';
+
+      const generatedSlug = `${slugify(rowTitulo)}-${rowCondicion}-${rowAnio}`;
+
+      const isUpdate = motos.some(
+        (existing) =>
+          (rowId && existing.id === rowId) ||
+          existing.slug === generatedSlug ||
+          (existing.titulo.trim().toLowerCase() === rowTitulo.trim().toLowerCase() &&
+            existing.condicion === rowCondicion &&
+            existing.anio === rowAnio)
+      );
+
+      parsedRows.push({
+        payload: {
+          id: rowId || undefined,
+          titulo: rowTitulo,
+          slug: generatedSlug,
+          marca_id: matchedMarca.id,
+          categoria_id: matchedCat.id,
+          condicion: rowCondicion,
+          estado: rowEstado,
+          cilindrada: rowCilindrada,
+          anio: rowAnio,
+          kilometraje: rowKm,
+          precio_contado: rowPrecio,
+          moneda: 'ARS',
+          mostrar_precio: rowMostrarPrecio,
+          entrega_minima: rowEntrega,
+          cuota_desde: rowCuota,
+          acepta_permuta: true,
+          financiacion_dni: true,
+          ficha_tecnica: {
+            motor: rowMotor,
+            arranque: rowArranque,
+            freno_delantero: rowFrenoDel,
+            freno_trasero: rowFrenoTras,
+            colores: ['Rojo', 'Negro', 'Blanco'],
+          },
+          descripcion: rowDesc,
+          imagen_portada: rowImagen,
+          galeria_imagenes: [rowImagen],
+          destacada: rowDestacada,
+          oferta_mes: rowOferta,
+        },
+        marcaLabel: matchedMarca.nombre,
+        categoriaLabel: matchedCat.nombre,
+        isUpdate,
+      });
+    }
+
+    if (parsedRows.length === 0) {
+      setImportError(
+        'No se encontraron filas válidas con columna "Titulo". Descargá la plantilla de ejemplo para verificar el formato.'
+      );
+      setImportPreviewRows([]);
+      return;
+    }
+
+    setImportPreviewRows(parsedRows);
+  };
+
+  const handleFileImportChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setImportError('');
     setImportSuccessMsg('');
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = String(event.target?.result || '').replace(/^\uFEFF/, '');
-        const lines = text
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean);
+    try {
+      const buffer = await file.arrayBuffer();
+      const firstBytes = new Uint8Array(buffer.slice(0, 4));
+      const isZipXlsx =
+        file.name.toLowerCase().endsWith('.xlsx') ||
+        (firstBytes[0] === 0x50 && firstBytes[1] === 0x4b);
 
-        if (lines.length < 2) {
-          setImportError(
-            'El archivo está vacío o no contiene filas de datos debajo del encabezado.'
-          );
-          setImportPreviewRows([]);
-          return;
-        }
-
-        // Auto-detectar separador (; de Excel en español, , o tabulación)
-        const headerLine = lines[0];
-        const semicolonCount = (headerLine.match(/;/g) || []).length;
-        const tabCount = (headerLine.match(/\t/g) || []).length;
-        const commaCount = (headerLine.match(/,/g) || []).length;
-        const delimiter =
-          semicolonCount >= commaCount && semicolonCount >= tabCount
-            ? ';'
-            : tabCount > commaCount
-            ? '\t'
-            : ',';
-
-        const headers = splitCsvLine(headerLine, delimiter).map((h) =>
-          h
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]/g, '')
-        );
-
-        const getCol = (cols: string[], possibleNames: string[]): string => {
-          for (const name of possibleNames) {
-            const idx = headers.findIndex((h) => h === name || h.includes(name));
-            if (idx !== -1 && cols[idx] !== undefined) {
-              return cols[idx].replace(/^"|"$/g, '').trim();
-            }
-          }
-          return '';
-        };
-
-        const parsedRows: Array<{
-          payload: Omit<Moto, 'id' | 'created_at' | 'updated_at'> & { id?: string };
-          marcaLabel: string;
-          categoriaLabel: string;
-          isUpdate: boolean;
-        }> = [];
-
-        for (let i = 1; i < lines.length; i++) {
-          const cols = splitCsvLine(lines[i], delimiter);
-          const rowTitulo = getCol(cols, ['titulo', 'modelo', 'nombre', 'moto', 'unidad']);
-          if (!rowTitulo) continue;
-
-          const rowId = getCol(cols, ['id']);
-          const rawMarca = getCol(cols, ['marca']);
-          const rawCat = getCol(cols, ['categoria', 'tipo', 'segmento']);
-          const rawCondicion = getCol(cols, ['condicion']).toLowerCase();
-          const rawEstado = getCol(cols, ['estado']).toLowerCase();
-
-          // Resolver Marca
-          const matchedMarca =
-            marcas.find(
-              (m) =>
-                m.nombre.toLowerCase() === rawMarca.toLowerCase() ||
-                m.slug.toLowerCase() === rawMarca.toLowerCase()
-            ) ||
-            marcas.find((m) =>
-              rowTitulo.toLowerCase().includes(m.nombre.toLowerCase())
-            ) ||
-            marcas[0];
-
-          // Resolver Categoría
-          const matchedCat =
-            categorias.find(
-              (c) =>
-                c.nombre.toLowerCase() === rawCat.toLowerCase() ||
-                c.slug.toLowerCase() === rawCat.toLowerCase() ||
-                (rawCat && c.nombre.toLowerCase().includes(rawCat.toLowerCase()))
-            ) || categorias[0];
-
-          const rowCondicion: CondicionMoto =
-            rawCondicion === 'usada' || rawCondicion === 'usado' ? 'usada' : '0km';
-
-          const rowEstado: EstadoMoto = ['disponible', 'reservada', 'vendida', 'pausada'].includes(
-            rawEstado
-          )
-            ? (rawEstado as EstadoMoto)
-            : 'disponible';
-
-          const rowCilindrada = parseCleanNumber(getCol(cols, ['cilindrada', 'cc'])) || 110;
-          const rowAnio = parseCleanNumber(getCol(cols, ['anio', 'ano'])) || 2026;
-          const rowKm =
-            rowCondicion === '0km'
-              ? 0
-              : parseCleanNumber(getCol(cols, ['kilometraje', 'km'])) || 0;
-
-          const rowPrecio = parseCleanNumber(getCol(cols, ['preciocontado', 'precio']));
-          const rowMostrarPrecio = parseYesNo(getCol(cols, ['mostrarprecio', 'visible']), true);
-          const rowEntrega = parseCleanNumber(getCol(cols, ['entregaminima', 'anticipo', 'entrega']));
-          const rowCuota = parseCleanNumber(getCol(cols, ['cuotadesde', 'cuota']));
-          const rowDestacada = parseYesNo(getCol(cols, ['destacada', 'home']), false);
-          const rowOferta = parseYesNo(getCol(cols, ['oferta', 'ofertames']), false);
-
-          const rowMotor = getCol(cols, ['motor']) || '4 tiempos monocilíndrico';
-          const rowArranque = getCol(cols, ['arranque']) || 'Eléctrico y patada';
-          const rowFrenoDel = getCol(cols, ['frenodelantero', 'frenodel']) || 'Disco';
-          const rowFrenoTras = getCol(cols, ['frenotrasero', 'frenotras']) || 'Tambor';
-          const rowImagen =
-            getCol(cols, ['imagenurl', 'imagen', 'foto', 'url']) ||
-            'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80';
-          const rowDesc =
-            getCol(cols, ['descripcion', 'detalle']) ||
-            'Entrega inmediata solo con DNI. Aceptamos tu moto usada en parte de pago.';
-
-          const generatedSlug = `${slugify(rowTitulo)}-${rowCondicion}-${rowAnio}`;
-
-          const isUpdate = motos.some(
-            (existing) =>
-              (rowId && existing.id === rowId) ||
-              existing.slug === generatedSlug ||
-              (existing.titulo.trim().toLowerCase() === rowTitulo.trim().toLowerCase() &&
-                existing.condicion === rowCondicion &&
-                existing.anio === rowAnio)
-          );
-
-          parsedRows.push({
-            payload: {
-              id: rowId || undefined,
-              titulo: rowTitulo,
-              slug: generatedSlug,
-              marca_id: matchedMarca.id,
-              categoria_id: matchedCat.id,
-              condicion: rowCondicion,
-              estado: rowEstado,
-              cilindrada: rowCilindrada,
-              anio: rowAnio,
-              kilometraje: rowKm,
-              precio_contado: rowPrecio,
-              moneda: 'ARS',
-              mostrar_precio: rowMostrarPrecio,
-              entrega_minima: rowEntrega,
-              cuota_desde: rowCuota,
-              acepta_permuta: true,
-              financiacion_dni: true,
-              ficha_tecnica: {
-                motor: rowMotor,
-                arranque: rowArranque,
-                freno_delantero: rowFrenoDel,
-                freno_trasero: rowFrenoTras,
-                colores: ['Rojo', 'Negro', 'Blanco'],
-              },
-              descripcion: rowDesc,
-              imagen_portada: rowImagen,
-              galeria_imagenes: [rowImagen],
-              destacada: rowDestacada,
-              oferta_mes: rowOferta,
-            },
-            marcaLabel: matchedMarca.nombre,
-            categoriaLabel: matchedCat.nombre,
-            isUpdate,
-          });
-        }
-
-        if (parsedRows.length === 0) {
-          setImportError(
-            'No se encontraron filas válidas con columna "Titulo". Descargá la plantilla de ejemplo para verificar el formato.'
-          );
-          setImportPreviewRows([]);
-          return;
-        }
-
-        setImportPreviewRows(parsedRows);
-      } catch {
-        setImportError('No se pudo leer el archivo. Asegurate de subir un archivo .CSV válido.');
+      if (isZipXlsx) {
+        const matrix = await parseExcelWorkbook(buffer);
+        processRawMatrixIntoPreview(matrix);
+        return;
       }
-    };
-    reader.readAsText(file, 'utf-8');
+
+      // Fallback para archivos .CSV o .TXT
+      const text = new TextDecoder('utf-8').decode(buffer).replace(/^\uFEFF/, '');
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      if (lines.length < 2) {
+        setImportError(
+          'El archivo está vacío o no contiene filas de datos debajo del encabezado.'
+        );
+        setImportPreviewRows([]);
+        return;
+      }
+
+      const headerLine = lines[0];
+      const semicolonCount = (headerLine.match(/;/g) || []).length;
+      const tabCount = (headerLine.match(/\t/g) || []).length;
+      const commaCount = (headerLine.match(/,/g) || []).length;
+      const delimiter =
+        semicolonCount >= commaCount && semicolonCount >= tabCount
+          ? ';'
+          : tabCount > commaCount
+          ? '\t'
+          : ',';
+
+      const matrix = lines.map((line) => splitCsvLine(line, delimiter));
+      processRawMatrixIntoPreview(matrix);
+    } catch {
+      setImportError(
+        'No se pudo leer el archivo. Asegurate de subir un archivo Excel (.xlsx) o .CSV válido.'
+      );
+    }
   };
 
   const handleConfirmImportMasivo = async () => {
@@ -857,15 +877,6 @@ export default function AdminDashboardPage() {
               <Eye className="w-4 h-4 text-emerald-400" />
               <span>Mostrar Precios</span>
             </button>
-
-            <Link
-              href="/"
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors"
-              title="Ir a la tienda pública"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Ver Tienda</span>
-            </Link>
 
             <button
               onClick={handleAdminLogout}
@@ -1009,10 +1020,10 @@ export default function AdminDashboardPage() {
               <div>
                 <h2 className="font-black text-neutral-950 text-base flex items-center gap-2">
                   <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                  <span>Gestión Masiva de Catálogo y Lista de Precios (Excel / CSV)</span>
+                  <span>Gestión Masiva de Catálogo y Lista de Precios (Excel .XLSX)</span>
                 </h2>
                 <p className="text-xs text-neutral-500">
-                  Exportá el inventario a Excel para editar precios masivamente o importá una planilla para dar de alta varias motos a la vez.
+                  Exportá el inventario a un libro nativo de Excel (.xlsx) con columnas separadas para editar precios o importá una planilla completa.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5">
@@ -1022,7 +1033,7 @@ export default function AdminDashboardPage() {
                   className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Exportar Inventario Excel (.CSV)</span>
+                  <span>Exportar Inventario Excel (.XLSX)</span>
                 </button>
                 <button
                   type="button"
@@ -1035,7 +1046,7 @@ export default function AdminDashboardPage() {
                   className="px-4 py-2.5 rounded-xl bg-neutral-950 hover:bg-red-600 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-sm transition-all whitespace-nowrap"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>Importar Masivo (Excel / CSV)</span>
+                  <span>Importar Masivo (Excel .XLSX)</span>
                 </button>
               </div>
             </div>
@@ -1986,10 +1997,10 @@ export default function AdminDashboardPage() {
               <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <span className="text-[11px] font-black uppercase tracking-wider text-red-600">
-                    Paso 1 • Formato de Planilla
+                    Paso 1 • Planilla Nativa de Excel (.XLSX)
                   </span>
                   <p className="text-xs text-neutral-700 font-medium">
-                    ¿Querés actualizar precios del stock actual o cargar motos desde cero? Descargá la base que prefieras, editala en Excel y guardala como <strong>CSV (delimitado por comas o punto y coma)</strong>.
+                    Descargá el stock actual o la plantilla en formato nativo <strong>.XLSX</strong> (cada dato en su propia columna lista para editar), guardá los cambios en Excel y volvé a subir el archivo.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1999,7 +2010,7 @@ export default function AdminDashboardPage() {
                     className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border border-neutral-300 font-bold text-xs flex items-center gap-1.5"
                   >
                     <Download className="w-3.5 h-3.5 text-red-600" />
-                    <span>Descargar Plantilla Ejemplo</span>
+                    <span>Descargar Plantilla (.XLSX)</span>
                   </button>
                   <button
                     type="button"
@@ -2048,7 +2059,7 @@ export default function AdminDashboardPage() {
                         Reemplazar todo el inventario actual
                       </span>
                       <span className="text-neutral-500">
-                        Borra el listado actual y deja únicamente las motos que estén en el archivo Excel/CSV.
+                        Borra el listado actual y deja únicamente las motos que estén en el archivo Excel.
                       </span>
                     </div>
                   </label>
@@ -2058,15 +2069,15 @@ export default function AdminDashboardPage() {
                   <Upload className="w-8 h-8 text-red-600" />
                   <div className="space-y-1">
                     <p className="text-xs font-black text-neutral-900">
-                      Paso 3 • Seleccioná tu archivo Excel (.CSV)
+                      Paso 3 • Seleccioná tu archivo Excel (.XLSX o .CSV)
                     </p>
                     <p className="text-[11px] text-neutral-500">
-                      Soporta archivos .CSV separados por punto y coma (;), coma (,) o tabulación
+                      Podés subir directamente el archivo .XLSX guardado desde Microsoft Excel
                     </p>
                   </div>
                   <input
                     type="file"
-                    accept=".csv,.txt"
+                    accept=".xlsx,.csv,.txt"
                     onChange={handleFileImportChange}
                     className="mt-2 block w-full text-xs text-neutral-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-neutral-950 file:text-white hover:file:bg-red-600 file:cursor-pointer"
                   />
