@@ -748,35 +748,35 @@ export default function AdminDashboardPage() {
 
   if (!isAdminAuth) {
     return (
-      <div className="min-h-[82vh] bg-neutral-950 flex items-center justify-center px-4 py-16">
-        <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl text-white space-y-6">
-          <div className="flex flex-col items-center text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-red-600 flex items-center justify-center shadow-lg shadow-red-600/30">
-              <Lock className="w-7 h-7 text-white" />
+      <div className="min-h-screen w-full bg-neutral-950 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-lg sm:max-w-xl bg-neutral-900/95 border border-neutral-800 rounded-[2rem] p-8 sm:p-12 shadow-2xl text-white space-y-8">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-red-600 flex items-center justify-center shadow-xl shadow-red-600/30">
+              <Lock className="w-8 h-8 text-white" />
             </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-red-500">
+            <div className="space-y-1.5">
+              <span className="text-xs font-black uppercase tracking-widest text-red-500 block">
                 Acceso Exclusivo Personal Autorizado
               </span>
-              <h1 className="text-2xl font-black tracking-tight mt-0.5">
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
                 Backoffice Elohim Motos
               </h1>
-              <p className="text-xs text-neutral-400 mt-1">
-                Ingresá la clave de la agencia para administrar el inventario y la
-                bandeja CRM de consultas.
+              <p className="text-sm text-neutral-400 max-w-md mx-auto leading-relaxed pt-1">
+                Ingresá la clave de la agencia para administrar el inventario, listas de
+                precios en Excel y la bandeja CRM de consultas.
               </p>
             </div>
           </div>
 
-          <form onSubmit={handleAdminLogin} className="space-y-4">
+          <form onSubmit={handleAdminLogin} className="space-y-5">
             {authError && (
-              <div className="p-3 rounded-xl bg-red-950/80 border border-red-700 text-xs font-bold text-red-300 text-center">
+              <div className="p-3.5 rounded-xl bg-red-950/80 border border-red-700 text-xs sm:text-sm font-bold text-red-300 text-center">
                 {authError}
               </div>
             )}
 
             <div>
-              <label className="block text-[11px] font-extrabold uppercase tracking-wider text-neutral-400 mb-1.5">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-neutral-400 mb-2">
                 Clave de Acceso
               </label>
               <input
@@ -786,22 +786,22 @@ export default function AdminDashboardPage() {
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
                 placeholder="Ingresá tu clave..."
-                className="w-full h-12 px-4 rounded-xl bg-neutral-950 border border-neutral-700 text-sm font-bold text-white focus:outline-none focus:border-red-600"
+                className="w-full h-14 px-5 rounded-2xl bg-neutral-950 border border-neutral-700 text-base font-bold text-white focus:outline-none focus:border-red-600 transition-colors"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full h-12 rounded-full bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-600/25 transition-all"
+              className="w-full h-14 rounded-full bg-red-600 hover:bg-red-500 text-white font-black text-sm uppercase tracking-wider shadow-xl shadow-red-600/25 transition-all"
             >
               Ingresar al Panel
             </button>
           </form>
 
-          <div className="pt-4 border-t border-neutral-800 text-center">
+          <div className="pt-5 border-t border-neutral-800 text-center">
             <Link
               href="/"
-              className="text-xs font-bold text-neutral-400 hover:text-white transition-colors"
+              className="text-sm font-bold text-neutral-400 hover:text-white transition-colors"
             >
               ← Volver al sitio público
             </Link>
