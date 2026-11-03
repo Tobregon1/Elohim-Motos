@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: false,
+  },
   images: {
     remotePatterns: [
       {

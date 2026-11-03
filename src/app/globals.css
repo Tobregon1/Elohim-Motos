@@ -95,3 +95,9 @@
 .animate-hero-progress {
   animation: heroProgress 6.5s linear forwards;
 }
+
+/* Ocultar indicador flotante de modo desarrollo de Next.js */
+nextjs-portal {
+  display: none !important;
+}
+
