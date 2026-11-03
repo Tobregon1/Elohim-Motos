@@ -1,12 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { MessageCircle, X, Users, MapPin, Zap, ChevronUp } from 'lucide-react';
 import { useStore } from '@/context/StoreContext';
 
 export default function WhatsAppWidget() {
+  const pathname = usePathname();
   const { vendedores, openWhatsAppRouter, config } = useStore();
   const [isOpen, setIsOpen] = useState(false);
+
+  // No mostrar el botón flotante de WhatsApp dentro del panel de administración
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   const activos = vendedores
     .filter((v) => v.activo)

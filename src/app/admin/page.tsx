@@ -427,9 +427,9 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-neutral-100 pb-20">
       {/* Top Admin Header */}
       <div className="bg-neutral-950 text-white py-8 border-b border-neutral-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
           <div>
-            <div className="flex items-center gap-2.5 mb-1">
+            <div className="flex items-center gap-2.5 mb-1.5">
               <span className="px-2.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-black uppercase tracking-widest">
                 Backoffice Oficial
               </span>
@@ -444,10 +444,10 @@ export default function AdminDashboardPage() {
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={openNewMotoModal}
-              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-red-600/25 transition-all"
+              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-red-600/25 transition-all whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               <span>Cargar Nueva Moto</span>
@@ -455,24 +455,33 @@ export default function AdminDashboardPage() {
 
             <button
               onClick={() => toggleAllPrecios(false)}
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-1.5"
+              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-1.5 whitespace-nowrap"
               title="Pasa todo el catálogo a 'Consultar Precio' en 1 clic"
             >
               <EyeOff className="w-4 h-4 text-amber-400" />
-              <span>Modo Volatilidad (Ocultar Precios)</span>
+              <span>Ocultar Precios</span>
             </button>
 
             <button
               onClick={() => toggleAllPrecios(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-1.5"
+              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-1.5 whitespace-nowrap"
             >
               <Eye className="w-4 h-4 text-emerald-400" />
               <span>Mostrar Precios</span>
             </button>
 
+            <Link
+              href="/"
+              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors"
+              title="Ir a la tienda pública"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Ver Tienda</span>
+            </Link>
+
             <button
               onClick={handleAdminLogout}
-              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-red-600 border border-neutral-700 hover:border-red-600 text-neutral-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+              className="px-3.5 py-2.5 rounded-xl bg-neutral-900 hover:bg-red-600 border border-neutral-700 hover:border-red-600 text-neutral-300 hover:text-white font-bold text-xs flex items-center gap-1.5 whitespace-nowrap transition-colors"
               title="Bloquear panel administrador"
             >
               <LogOut className="w-4 h-4" />

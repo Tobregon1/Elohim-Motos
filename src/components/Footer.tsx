@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Bike,
   MapPin,
@@ -18,7 +19,13 @@ import {
 import { useStore } from '@/context/StoreContext';
 
 export default function Footer() {
+  const pathname = usePathname();
   const { config } = useStore();
+
+  // Ocultar el footer público dentro del panel de administración para mayor limpieza
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <footer className="bg-neutral-950 text-neutral-300 border-t border-neutral-800">

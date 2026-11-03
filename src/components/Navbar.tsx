@@ -75,6 +75,11 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [router]);
 
+  // Ocultar completamente la barra de navegación pública dentro del panel de administración
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
+
   const motosActivas = motos.filter((m) => m.estado !== 'pausada');
 
   // Motos de la marca seleccionada en el Mega-Menu
