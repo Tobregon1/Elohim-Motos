@@ -139,9 +139,7 @@ export default function ContactoPage() {
                 Mapa Interactivo • {config.direccion}, {config.ciudad}
               </span>
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  `${config.direccion}, ${config.ciudad}`
-                )}`}
+                href="https://maps.app.goo.gl/bhm3G5ydiAqXFwms7"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-red-400 hover:text-red-300 underline"

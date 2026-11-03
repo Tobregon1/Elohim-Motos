@@ -80,10 +80,10 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   MOTOS: 'elohim_motos_v2',
-  VENDEDORES: 'elohim_vendedores_v1',
+  VENDEDORES: 'elohim_vendedores_v2',
   LEADS_FIN: 'elohim_leads_fin_v1',
   LEADS_PERM: 'elohim_leads_perm_v1',
-  CONFIG: 'elohim_config_v1',
+  CONFIG: 'elohim_config_v2',
   ROTACION_IDX: 'elohim_wa_rotacion_idx_v1',
 };
 
@@ -189,7 +189,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          if (dbVendedores?.length) setVendedores(dbVendedores);
+          if (dbVendedores?.length) {
+            const hasPlaceholderPhone = dbVendedores.some((v: Vendedor) =>
+              v.whatsapp.startsWith('54937945501')
+            );
+            if (hasPlaceholderPhone) {
+              const updatedVendedores = dbVendedores.map((v: Vendedor) => ({
+                ...v,
+                whatsapp: '5493795087892',
+                sucursal: 'Av. Centenario 4145 (Av. Raúl Alfonsín 4145)',
+              }));
+              setVendedores(updatedVendedores);
+              // Actualizar también en Supabase si la política lo permite
+              for (const uv of updatedVendedores) {
+                await supabase
+                  .from('vendedores')
+                  .update({
+                    whatsapp: uv.whatsapp,
+                    sucursal: uv.sucursal,
+                  })
+                  .eq('id', uv.id);
+              }
+            } else {
+              setVendedores(dbVendedores);
+            }
+          }
           if (dbLeadsFin) setLeadsFinanciacion(dbLeadsFin);
           if (dbLeadsPerm) setLeadsPermutas(dbLeadsPerm);
         } catch (err) {

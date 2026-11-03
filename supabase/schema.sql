@@ -239,7 +239,7 @@ INSERT INTO categorias (nombre, slug, icono, orden) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO vendedores (nombre, whatsapp, sucursal, activo, orden_rotacion) VALUES
-('Matías - Ventas 0km y Créditos', '5493794550101', 'Casa Central - Av. Independencia', true, 1),
-('Lucas - Usados Seleccionados y Permutas', '5493794550102', 'Casa Central - Av. Independencia', true, 2),
-('Sofía - Financiación DNI y Cuota Simple', '5493794550103', 'Sucursal Cazadores Correntinos', true, 3);
+('Matías - Ventas 0km y Créditos', '5493795087892', 'Av. Centenario 4145 (Av. Raúl Alfonsín 4145)', true, 1),
+('Lucas - Usados Seleccionados y Permutas', '5493795087892', 'Av. Centenario 4145 (Av. Raúl Alfonsín 4145)', true, 2),
+('Sofía - Financiación DNI y Cuota Simple', '5493795087892', 'Av. Centenario 4145 (Av. Raúl Alfonsín 4145)', true, 3);
 
